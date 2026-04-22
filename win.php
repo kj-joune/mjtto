@@ -430,6 +430,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (isset($_GET['saved']) && $_GET['saved'] === '1') {
     $success_msg = '지급요청이 접수되었습니다.';
+    if ($request_claim_name === '' && $has_request_winner) {
+        $refreshed = sql_query("
+            SELECT issue_item_id, customer_name, customer_hp
+              FROM mz_issue_item
+             WHERE issue_item_id IN (".implode(',', array_map('intval', $request_item_ids)).")
+             ORDER BY issue_item_id ASC
+        ");
+        while ($rr = sql_fetch_array($refreshed)) {
+            if ($request_claim_name === '' && trim((string)$rr['customer_name']) !== '') {
+                $request_claim_name = trim((string)$rr['customer_name']);
+            }
+            if ($request_claim_hp === '' && trim((string)$rr['customer_hp']) !== '') {
+                $request_claim_hp = trim((string)$rr['customer_hp']);
+            }
+        }
+    }
 }
 
 $company_line_1 = trim((string)$base_item['branch_print_name_1']) !== '' ? trim((string)$base_item['branch_print_name_1']) : trim((string)$base_item['contract_print_name_1']);
@@ -439,3 +455,197 @@ if ($company_line_1 === '') {
 $company_line_2 = trim((string)$base_item['branch_print_name_2']) !== '' ? trim((string)$base_item['branch_print_name_2']) : trim((string)$base_item['branch_name']);
 $company_tel = trim((string)$base_item['branch_tel_no']) !== '' ? trim((string)$base_item['branch_tel_no']) : trim((string)$base_item['contract_tel_no']);
 ?>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>당첨조회</title>
+<style>
+body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#f5f7fb;margin:0;padding:0;color:#111827;}
+.wrap{max-width:760px;margin:24px auto;background:#fff;padding:24px;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.08);}
+.title{text-align:center;font-size:26px;font-weight:700;margin-bottom:8px;}
+.sub{text-align:center;color:#6b7280;font-size:14px;margin-bottom:20px;}
+.box{border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin-bottom:16px;background:#fff;}
+.company{text-align:center;line-height:1.6;font-size:15px;margin-bottom:8px;}
+.notice-ok,.notice-error{padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:14px;}
+.notice-ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;}
+.notice-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
+.table{width:100%;border-collapse:collapse;}
+.table th,.table td{padding:12px 10px;border-top:1px solid #f0f0f0;text-align:left;font-size:14px;vertical-align:top;}
+.table th{width:150px;background:#fafafa;}
+.grid{display:grid;grid-template-columns:repeat(6,minmax(35px,1fr));gap:8px;margin:10px 0;}
+.ball{height:35px;line-height:35px;text-align:center;border-radius:999px;border:2px solid #111827;font-size:17px;font-weight:700;background:#fff;}
+.ball.win{background:#111827;color:#fff;}
+.game-card{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-top:10px;}
+.game-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+.game-label{font-weight:700;font-size:15px;}
+.game-result{font-weight:700;}
+.game-result.win{color:#b91c1c;}
+.game-result.lose{color:#374151;}
+.nums-balls{display:grid;grid-template-columns:repeat(6,minmax(32px,1fr));gap:6px;margin:8px 0 10px;}
+.num-ball{height:32px;line-height:32px;text-align:center;border-radius:999px;border:1px solid #d1d5db;font-size:15px;font-weight:700;background:#fff;color:#111827;}
+.num-ball.match{background:#111827;border-color:#111827;color:#fff;}
+.num-ball.bonus{background:#fff7ed;border-color:#fb923c;color:#c2410c;}
+.match-text{font-size:13px;color:#4b5563;line-height:1.5;margin-top:2px;}
+.meta{font-size:12px;color:#6b7280;line-height:1.6;margin-top:6px;}
+.meta-line{display:block;margin-top:2px;}
+.prize-line{word-break:keep-all;}
+.jump-link{display:inline-block;height:34px;line-height:34px;padding:0 12px;border-radius:8px;background:#fff7ed;border:1px solid #fdba74;color:#c2410c;font-size:13px;font-weight:700;text-decoration:none;}
+.jump-link:hover{text-decoration:none;background:#ffedd5;}
+.input{width:100%;height:44px;padding:0 12px;border:1px solid #d1d5db;border-radius:10px;box-sizing:border-box;font-size:15px;}
+.form-row{margin-bottom:12px;}
+.btn{display:inline-block;height:46px;line-height:46px;padding:0 18px;border:0;border-radius:10px;background:#111827;color:#fff;font-size:15px;cursor:pointer;text-decoration:none;}
+.btn.small{height:38px;line-height:38px;padding:0 14px;font-size:14px;}
+.action-row{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.prize-list{line-height:1.8;font-size:14px;}
+.center{text-align:center;}
+.muted{color:#3300cc;}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="title">당첨조회</div>
+    <div class="sub">QR 또는 쿠폰번호로 연결된 발권 1장 기준 조회입니다.</div>
+
+    <?php if ($success_msg !== '') { ?>
+        <div class="notice-ok"><?php echo mjtto_h($success_msg); ?></div>
+    <?php } ?>
+    <?php if ($error_msg !== '') { ?>
+        <div class="notice-error"><?php echo mjtto_h($error_msg); ?></div>
+    <?php } ?>
+
+    <div class="box">
+        <div class="company">
+            <div><?php echo mjtto_h($company_line_1); ?></div>
+            <div><?php echo $company_line_2 !== '' ? mjtto_h($company_line_2) : '&nbsp;'; ?></div>
+            <div><?php echo $company_tel !== '' ? 'TEL. '.mjtto_h($company_tel) : '&nbsp;'; ?></div>
+        </div>
+        <table class="table">
+            <tr><th>발권번호</th><td><?php echo mjtto_h($base_item['issue_no']); ?></td></tr>
+            <tr><th>조회 쿠폰번호</th><td><?php echo mjtto_h($ticket_no); ?></td></tr>
+            <tr><th>회차</th><td><?php echo (int)$base_item['round_no']; ?>회</td></tr>
+            <tr><th>페이지</th><td><?php echo (int)$page_no; ?> / <?php echo (int)$total_page; ?> 장</td></tr>
+            <tr><th>추첨일</th><td><?php echo !empty($round['draw_date']) ? mjtto_h($round['draw_date']) : '-'; ?></td></tr>
+            <tr><th>지급기한</th><td><?php echo !empty($round['payout_deadline']) ? mjtto_h($round['payout_deadline']) : '-'; ?></td></tr>
+        </table>
+    </div>
+
+    <div class="box">
+        <div style="font-weight:700;margin-bottom:8px;">당첨번호</div>
+        <?php if ($draw_ready) { ?>
+            <div class="grid">
+                <?php foreach ($win_numbers as $n) { ?>
+                    <div class="ball win"><?php echo sprintf('%02d', $n); ?></div>
+                <?php } ?>
+            </div>
+            <div class="center muted">보너스 번호 : <?php echo sprintf('%02d', $bonus_no); ?></div>
+        <?php } else { ?>
+            <div class="center muted">
+			<strong>추첨 전 입니다. <BR><BR>
+			이번주 토요일 TV로또<BR>
+			방송 이후 확인가능합니다.</strong></div>
+        <?php } ?>
+    </div>
+
+    <div class="box">
+        <div style="font-weight:700;margin-bottom:8px;">이 장의 게임 결과</div>
+        <?php foreach ($rows_view as $rowv) { ?>
+            <div class="game-card">
+                <div class="game-head">
+                    <div class="game-label"><?php echo mjtto_h($rowv['label']); ?> 게임</div>
+                    <div class="game-result <?php echo $rowv['rank'] > 0 ? 'win' : 'lose'; ?>"><?php echo mjtto_h($rowv['result_text']); ?></div>
+                </div>
+                <div class="nums-balls">
+                    <?php foreach ($rowv['numbers'] as $game_no) {
+                        $num_class = 'num-ball';
+                        if ($draw_ready && !empty($rowv['matched_number_map'][(int)$game_no])) {
+                            $num_class .= ' match';
+                        } elseif ($draw_ready && $rowv['bonus_match'] && (int)$game_no === (int)$bonus_no) {
+                            $num_class .= ' bonus';
+                        }
+                    ?>
+                        <div class="<?php echo $num_class; ?>"><?php echo sprintf('%02d', $game_no); ?></div>
+                    <?php } ?>
+                </div>
+                <?php if ($draw_ready) { ?>
+                <div class="match-text">
+                    당첨번호 : <?php echo count($rowv['matched_numbers']) ? mjtto_h(implode(', ', array_map(function($n){ return sprintf('%02d', $n); }, $rowv['matched_numbers']))) : '없음'; ?>
+                    <?php if ($rowv['bonus_match']) { ?> / 보너스 : <?php echo sprintf('%02d', $bonus_no); ?><?php } ?>
+                </div>
+                <?php } ?>
+                <div class="meta">
+                    <div class="meta-line">티켓번호 : <?php echo mjtto_h($rowv['ticket_no']); ?></div>
+                    <div class="meta-line">상태 : <?php echo mjtto_h($rowv['item_status_text']); ?></div>
+                    <?php if ($rowv['claim_status_text'] !== '') { ?>
+                        <div class="meta-line">지급상태 : <?php echo mjtto_h($rowv['claim_status_text']); ?></div>
+                    <?php } ?>
+                    <?php if ($draw_ready) { ?>
+                        <div class="meta-line">일치수 : <?php echo (int)$rowv['match_count']; ?>개<?php if ($rowv['bonus_match']) { ?> / 보너스 일치<?php } ?></div>
+                    <?php } ?>
+                    <?php if ($rowv['prize_text'] !== '') { ?>
+                        <div class="meta-line prize-line">경품 : <?php echo mjtto_h($rowv['prize_text']); ?></div>
+                    <?php } ?>
+                </div>
+                <?php if ($rowv['can_request_info']) { ?>
+                <div class="action-row">
+                    <a href="#claim-request-form" class="jump-link">눌러서 정보입력 하세요</a>
+                </div>
+                <?php } elseif ($rowv['request_block_reason'] !== '') { ?>
+                <div class="action-row">
+                    <span class="muted"><?php echo mjtto_h($rowv['request_block_reason']); ?></span>
+                </div>
+                <?php } ?>
+            </div>
+        <?php } ?>
+    </div>
+
+    <div class="box">
+        <div style="font-weight:700;margin-bottom:8px;">등수별 경품</div>
+        <div class="prize-list">
+            <?php for ($rank = 1; $rank <= 5; $rank++) {
+                $line = '준비중';
+                if (isset($prize_map[$rank])) {
+                    $line = trim((string)$prize_map[$rank]['prize_name']);
+                    $desc = trim((string)$prize_map[$rank]['prize_desc']);
+                    if ($desc !== '') {
+                        $line .= ' ('.$desc.')';
+                    }
+                }
+            ?>
+                <?php echo $rank; ?>등 : <?php echo mjtto_h($line); ?><br>
+            <?php } ?>
+        </div>
+    </div>
+
+    <?php if ($draw_ready && $has_request_winner) { ?>
+    <div class="box" id="claim-request-form">
+        <div style="font-weight:700;margin-bottom:8px;">당첨자 정보 접수</div>
+        <?php if ($request_claim_name !== '' || $request_claim_hp !== '') { ?>
+            <table class="table" style="margin-bottom:16px;">
+                <tr><th>당첨자 이름</th><td><?php echo mjtto_h($request_claim_name); ?></td></tr>
+                <tr><th>휴대폰번호</th><td><?php echo mjtto_h($request_claim_hp); ?></td></tr>
+            </table>
+        <?php } ?>
+        <form method="post" action="./win.php?no=<?php echo urlencode($ticket_no); ?>">
+            <input type="hidden" name="action" value="save_claimant">
+            <div class="form-row">
+                <input type="text" name="customer_name" class="input" placeholder="당첨자 이름" value="<?php echo mjtto_h($request_claim_name); ?>" maxlength="100" required>
+            </div>
+            <div class="form-row">
+                <input type="text" name="customer_hp" class="input" placeholder="휴대폰번호" value="<?php echo mjtto_h($request_claim_hp); ?>" maxlength="20" required>
+            </div>
+            <button type="submit" class="btn">지급요청 접수</button>
+        </form>
+        <div class="meta" style="margin-top:10px;">
+            이 장의 1~5등 당첨 게임은 모두 이름과 휴대폰번호를 입력해 지급요청할 수 있습니다.
+        </div>
+    </div>
+    <?php } elseif ($draw_ready && $has_winner) { ?>
+    <div class="box">
+        <div class="meta"><?php echo ($deadline_expired && !$has_claimed_winner) ? mjtto_h($deadline_message) : '이 장의 당첨 게임은 이미 지급요청이 접수되었거나 처리 상태입니다.'; ?></div>
+    </div>
+    <?php } ?>
+</div>
+</body>
+</html>
