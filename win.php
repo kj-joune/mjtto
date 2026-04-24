@@ -470,6 +470,7 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
 .company{text-align:center;line-height:1.6;font-size:15px;margin-bottom:8px;}
 .notice-ok,.notice-error{padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:14px;}
 .notice-ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;}
+.notice-warn{margin-top:10px;color:#b91c1c;font-weight:700;line-height:1.7;}
 .notice-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
 .table{width:100%;border-collapse:collapse;}
 .table th,.table td{padding:12px 10px;border-top:1px solid #f0f0f0;text-align:left;font-size:14px;vertical-align:top;}
@@ -509,7 +510,14 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
     <div class="sub">QR 또는 쿠폰번호로 연결된 발권 1장 기준 조회입니다.</div>
 
     <?php if ($success_msg !== '') { ?>
-        <div class="notice-ok"><?php echo mjtto_h($success_msg); ?></div>
+        <div class="notice-ok">
+            <?php echo mjtto_h($success_msg); ?>
+            <div class="notice-warn">
+                5등당첨 문자 받지 못받으시 분  <br>
+				(차단된 메세지에서 필수 확인) <br>
+                발송번호 매주또 1661-5022
+            </div>
+        </div>
     <?php } ?>
     <?php if ($error_msg !== '') { ?>
         <div class="notice-error"><?php echo mjtto_h($error_msg); ?></div>
