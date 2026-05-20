@@ -123,6 +123,7 @@ if (!function_exists('mjtto_list_url')) {
                 return './branch_list.php';
             }
             if (strpos($script_name, 'claim_') !== false) return './claim_list.php';
+            if (strpos($script_name, 'inquiry_') !== false) return './inquiry_list.php';
             if (strpos($script_name, 'issue_') !== false) return './issue_list.php';
             if (strpos($script_name, 'settlement_') !== false) return './settlement_month.php';
         }

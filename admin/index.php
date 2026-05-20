@@ -104,6 +104,13 @@ include_once __DIR__ . '/_admin_head.php';
  		</div>
    </div>
     <div class="card">
+        <h2>웹 문의 관리</h2>
+        <p>웹사이트에서 접수된 제휴 및 공급 문의를 관리자에서 바로 확인합니다.</p>
+		<div class="btn-row">
+	        <a href="./inquiry_list.php" class="btn btn-primary">문의목록</a>
+		</div>
+    </div>
+    <div class="card">
         <h2>운영 보조</h2>
         <p>추첨 데이터 동기화 등 운영 보조 기능입니다.</p>
  		<div class="btn-row">
