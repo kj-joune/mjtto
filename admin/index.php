@@ -16,11 +16,59 @@ if (!function_exists('mjtto_sms_payment_text')) {
     }
 }
 
+if (!function_exists('mjtto_admin_inquiry_summary')) {
+    function mjtto_admin_inquiry_summary()
+    {
+        global $g5;
+
+        $bo_table = 'inquiry';
+        $board = sql_fetch(" SELECT bo_table FROM {$g5['board_table']} WHERE bo_table = '{$bo_table}' ");
+        if (!$board || empty($board['bo_table'])) {
+            return array('unread_count' => 0, 'total_count' => 0);
+        }
+
+        $write_table = $g5['write_prefix'] . $bo_table;
+        $column_result = sql_query(" SHOW COLUMNS FROM `{$write_table}` ", false);
+        $has_wr6 = false;
+
+        if ($column_result) {
+            while ($column_row = sql_fetch_array($column_result)) {
+                if ((string)$column_row['Field'] === 'wr_6') {
+                    $has_wr6 = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$has_wr6) {
+            $count_row = sql_fetch(" SELECT COUNT(*) AS cnt FROM {$write_table} WHERE (wr_parent = wr_id OR wr_parent = 0) ");
+            return array(
+                'unread_count' => 0,
+                'total_count' => (int)($count_row['cnt'] ?? 0)
+            );
+        }
+
+        $count_row = sql_fetch("
+            SELECT
+                COUNT(*) AS total_count,
+                COALESCE(SUM(CASE WHEN wr_6 = '' OR wr_6 IS NULL THEN 1 ELSE 0 END), 0) AS unread_count
+            FROM {$write_table}
+            WHERE (wr_parent = wr_id OR wr_parent = 0)
+        ");
+
+        return array(
+            'unread_count' => (int)($count_row['unread_count'] ?? 0),
+            'total_count' => (int)($count_row['total_count'] ?? 0)
+        );
+    }
+}
+
 $sms_point_info = mjtto_sms_get_point_info();
 $sms_sender_number = mjtto_sms_get_sender_number();
 $sms_account_id = trim((string)($config['cf_icode_id'] ?? ''));
 $sms_server_host = trim((string)($config['cf_icode_server_ip'] ?? ''));
 $contract_prize_options = $auth['role'] === 'SUPER_ADMIN' ? mjtto_get_accessible_contracts($auth) : array();
+$inquiry_summary = $auth['role'] === 'SUPER_ADMIN' ? mjtto_admin_inquiry_summary() : array('unread_count' => 0, 'total_count' => 0);
 
 include_once __DIR__ . '/_admin_head.php';
 ?>
@@ -49,6 +97,7 @@ include_once __DIR__ . '/_admin_head.php';
 .quick-badge.fail{background:#fef2f2;color:#b91c1c;}
 .inline-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .inline-form select{height:35px;padding:0 12px;border:1px solid #d1d5db;border-radius:8px;min-width:220px;box-sizing:border-box;background:#fff;}
+.badge-inline{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 10px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:800;line-height:1;}
 </style>
 <h1 class="page-title">관리자 홈</h1>
 <div class="notice">
@@ -108,6 +157,7 @@ include_once __DIR__ . '/_admin_head.php';
         <p>웹사이트에서 접수된 제휴 및 공급 문의를 관리자에서 바로 확인합니다.</p>
 		<div class="btn-row">
 	        <a href="./inquiry_list.php" class="btn btn-primary">문의목록</a>
+            <span class="badge-inline"><?php echo number_format((int)$inquiry_summary['unread_count']); ?> / <?php echo number_format((int)$inquiry_summary['total_count']); ?></span>
 		</div>
     </div>
     <div class="card">
