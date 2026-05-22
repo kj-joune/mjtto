@@ -387,8 +387,8 @@
   });
 })();
 
-/*  chat-GPT sign: aewha007@gmail.com | datetime: 2026-05-20 02:55:00 KST  */
-/* Weekly Prizes 제휴사 로고 자동 스크롤 + 화살표 */
+/*  chat-GPT sign: aewha007@gmail.com | datetime: 2026-05-21 15:16:00 KST  */
+/* Weekly Prizes 제휴사 로고 연속 마퀴 스크롤 */
 
 (function () {
   function initMjttoPartnerAutoSlider() {
@@ -396,104 +396,162 @@
     if (!slider) return;
 
     var viewport = slider.querySelector('[data-mjtto-partner-viewport]');
+    var track = slider.querySelector('.mjtto-partner-track');
     var prevButton = slider.querySelector('[data-mjtto-partner-prev]');
     var nextButton = slider.querySelector('[data-mjtto-partner-next]');
-    var autoTimer = null;
     var isPaused = false;
+    var animationFrameId = null;
+    var lastTimestamp = 0;
+    var currentOffset = 0;
+    var autoSpeed = 34;
 
-    if (!viewport) return;
+    if (!viewport || !track) return;
+
+    var originalItems = Array.prototype.slice.call(track.querySelectorAll('.mjtto-origin-partner-item'));
+    if (!originalItems.length) return;
+
+    originalItems.forEach(function (item) {
+      track.appendChild(item.cloneNode(true));
+    });
+
+    function getItemGap() {
+      var styles = window.getComputedStyle(track);
+      return parseFloat(styles.columnGap || styles.gap || '0') || 0;
+    }
 
     function getScrollAmount() {
-      var firstItem = viewport.querySelector('.mjtto-origin-partner-item');
+      var firstItem = track.querySelector('.mjtto-origin-partner-item');
       if (!firstItem) return 180;
 
-      return firstItem.offsetWidth + 10;
+      return firstItem.offsetWidth + getItemGap();
     }
 
-    function getMaxScrollLeft() {
-      return viewport.scrollWidth - viewport.clientWidth;
+    function getLoopWidth() {
+      return track.scrollWidth / 2;
     }
 
-    function movePartner(direction) {
-      var amount = getScrollAmount();
-      var maxScrollLeft = getMaxScrollLeft();
+    function applyOffset() {
+      track.style.transform = 'translate3d(' + (-currentOffset) + 'px,0,0)';
+    }
 
-      if (direction > 0) {
-        if (viewport.scrollLeft + amount >= maxScrollLeft - 8) {
-          viewport.scrollTo({
-            left: 0,
-            behavior: 'smooth'
-          });
-        } else {
-          viewport.scrollBy({
-            left: amount,
-            behavior: 'smooth'
-          });
-        }
-      } else {
-        if (viewport.scrollLeft <= 8) {
-          viewport.scrollTo({
-            left: maxScrollLeft,
-            behavior: 'smooth'
-          });
-        } else {
-          viewport.scrollBy({
-            left: -amount,
-            behavior: 'smooth'
-          });
-        }
+    function normalizeLoopPosition() {
+      var loopWidth = getLoopWidth();
+      if (!loopWidth) return;
+
+      while (currentOffset >= loopWidth) {
+        currentOffset -= loopWidth;
       }
+
+      while (currentOffset < 0) {
+        currentOffset += loopWidth;
+      }
+    }
+
+    function setPaused(paused) {
+      isPaused = !!paused;
+      slider.classList.toggle('is-paused', isPaused);
+    }
+
+    function tick(timestamp) {
+      if (!lastTimestamp) {
+        lastTimestamp = timestamp;
+      }
+
+      var delta = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      if (!isPaused) {
+        currentOffset += (autoSpeed * delta) / 1000;
+        normalizeLoopPosition();
+        applyOffset();
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick);
     }
 
     function startAutoScroll() {
-      stopAutoScroll();
-
-      autoTimer = setInterval(function () {
-        if (!isPaused) {
-          movePartner(1);
-        }
-      }, 2600);
+      if (animationFrameId) return;
+      lastTimestamp = 0;
+      animationFrameId = window.requestAnimationFrame(tick);
     }
 
     function stopAutoScroll() {
-      if (autoTimer) {
-        clearInterval(autoTimer);
-        autoTimer = null;
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
       }
+    }
+
+    function nudge(direction) {
+      var distance = getScrollAmount() * direction;
+      var start = currentOffset;
+      var duration = 520;
+      var startTime = null;
+      setPaused(true);
+
+      function easeInOutCubic(t) {
+        return t < 0.5
+          ? 4 * t * t * t
+          : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      function step(timestamp) {
+        if (!startTime) {
+          startTime = timestamp;
+        }
+
+        var progress = Math.min((timestamp - startTime) / duration, 1);
+        currentOffset = start + (distance * easeInOutCubic(progress));
+        normalizeLoopPosition();
+        applyOffset();
+
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+          return;
+        }
+
+        setPaused(false);
+      }
+
+      window.requestAnimationFrame(step);
     }
 
     if (prevButton) {
       prevButton.addEventListener('click', function () {
-        movePartner(-1);
-        startAutoScroll();
+        nudge(-1);
       });
     }
 
     if (nextButton) {
       nextButton.addEventListener('click', function () {
-        movePartner(1);
-        startAutoScroll();
+        nudge(1);
       });
     }
 
     slider.addEventListener('mouseenter', function () {
-      isPaused = true;
+      setPaused(true);
     });
 
     slider.addEventListener('mouseleave', function () {
-      isPaused = false;
+      setPaused(false);
     });
 
     slider.addEventListener('touchstart', function () {
-      isPaused = true;
+      setPaused(true);
     }, { passive: true });
 
     slider.addEventListener('touchend', function () {
       setTimeout(function () {
-        isPaused = false;
+        setPaused(false);
       }, 1200);
     }, { passive: true });
 
+    window.addEventListener('resize', function () {
+      normalizeLoopPosition();
+      applyOffset();
+    });
+
+    applyOffset();
     startAutoScroll();
   }
 

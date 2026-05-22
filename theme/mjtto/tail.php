@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit;
 
 $mjtto_admin_url = 'https://adm.mjtto.com/admin';
 
-add_javascript('<script src="'.G5_THEME_URL.'/js/mjtto.js?ver=20260520_172024"></script>', 0);
+add_javascript('<script src="'.G5_THEME_URL.'/js/mjtto.js?ver=20260521_032024"></script>', 0);
 ?>
   </main>
 
