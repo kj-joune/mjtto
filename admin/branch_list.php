@@ -111,7 +111,17 @@ include_once __DIR__ . '/_admin_head.php';
         <tr>
 			<td><?php echo $number; ?></td>
 			<td><?php echo nl2br(get_text($row['company_name'])); ?></td>
-			<td><?php echo get_text(trim($row['print_name_1'])); ?><?php if (trim($row['print_name_2']) !== '') echo '<br>'.get_text(trim($row['print_name_2'])); ?></td>
+                <td><?php
+                    $print_name_1 = trim((string)$row['print_name_1']);
+                    $print_name_2 = trim((string)$row['print_name_2']);
+                    if ($print_name_1 !== '' && strpos($print_name_1, '||') !== false) {
+                        $print_parts = explode('||', $print_name_1, 2);
+                        $print_name_1 = trim((string)($print_parts[0] ?? ''));
+                        $print_name_2 = trim((string)($print_parts[1] ?? ''));
+                    }
+                    echo get_text($print_name_1);
+                    if ($print_name_2 !== '') echo '<br>'.get_text($print_name_2);
+                ?></td>
 			<td><?php echo (int)$row['issue_game_count']; ?>게임</td>
 			<td><?php echo get_text($row['company_code']); ?></td>
 			<td><?php echo get_text($row['coupon_prefix']); ?></td>

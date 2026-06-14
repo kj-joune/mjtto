@@ -19,6 +19,7 @@ if (mjtto_claim_column_exists('reward_ticket_no')) {
 $has_reward_ticket_column = ($reward_ticket_column !== '');
 $has_sms_result_column = mjtto_claim_column_exists('sms_send_result');
 $has_sms_sent_at_column = mjtto_claim_column_exists('sms_sent_at');
+$has_request_birth_column = mjtto_claim_column_exists('request_birth');
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $rows = 20;
 $from_record = ($page - 1) * $rows;
@@ -57,6 +58,7 @@ if ($stx !== '') {
             pc.ticket_no LIKE '%{$stx_sql}%'
             OR pc.request_name LIKE '%{$stx_sql}%'
             OR pc.request_hp LIKE '%{$stx_sql}%'
+            " . ($has_request_birth_column ? "OR pc.request_birth LIKE '%{$stx_sql}%'\n            " : '') . "
             OR i.issue_no LIKE '%{$stx_sql}%'
             OR c.company_name LIKE '%{$stx_sql}%'
             OR b.company_name LIKE '%{$stx_sql}%'
@@ -93,14 +95,14 @@ $summary = sql_fetch("\n    SELECT\n        COUNT(*) AS total_count,\n        CO
 
 $result = sql_query("\n    SELECT\n        pc.*,\n        i.issue_no,\n        i.created_by AS issue_created_by,\n        i.created_at AS issue_created_at,\n        c.company_name AS contract_name,\n        b.company_name AS branch_name\n    {$sql_common}\n    ORDER BY pc.claim_id DESC\n    LIMIT {$from_record}, {$rows}\n");
 
-$query_params = array();
-if ($round_no > 0) $query_params['round_no'] = $round_no;
-if ($claim_status !== '') $query_params['claim_status'] = $claim_status;
-if ($result_rank > 0) $query_params['result_rank'] = $result_rank;
-if ($stx !== '') $query_params['stx'] = $stx;
+$query_params = array(
+    'round_no' => ($round_no_raw !== null) ? (string)$round_no_raw : '',
+    'claim_status' => $claim_status,
+    'result_rank' => (string)$result_rank,
+    'stx' => $stx,
+);
 $qstr = http_build_query($query_params);
-$qstr_prefix = $qstr ? '&' . $qstr : '';
-$return_url = './claim_list.php' . ($qstr ? '?' . $qstr . '&page=' . $page : '?page=' . $page);
+$return_url = './claim_list.php' . ($qstr !== '' ? '?' . $qstr . '&page=' . $page : '?page=' . $page);
 
 $active_filters = array();
 if ($round_no > 0) $active_filters[] = $round_no . '회';
@@ -270,6 +272,7 @@ include_once __DIR__ . '/_admin_head.php';
                     <td>
                         <div><?php echo get_text($row['request_name']); ?></div>
                         <div class="sub"><?php echo get_text($row['request_hp']); ?></div>
+                        <?php if ($has_request_birth_column && !empty($row['request_birth'])) { ?><div class="sub">생년월일: <?php echo get_text($row['request_birth']); ?></div><?php } ?>
                     </td>
                     <td>
                         <span class="badge <?php echo mjtto_claim_badge_class($row['claim_status']); ?>"><?php echo get_text(mjtto_claim_status_name($row['claim_status'])); ?></span>
@@ -321,7 +324,7 @@ include_once __DIR__ . '/_admin_head.php';
             if ($p == $page) {
                 echo '<strong>'.$p.'</strong>';
             } else {
-                echo '<a href="./claim_list.php?page='.$p.$qstr_prefix.'">'.$p.'</a>';
+                echo '<a href="./claim_list.php?'.$qstr.'&page='.$p.'">'.$p.'</a>';
             }
         }
         ?>

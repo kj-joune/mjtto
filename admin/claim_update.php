@@ -35,6 +35,28 @@ if (!function_exists('mjtto_alert_back')) {
     }
 }
 
+if (!function_exists('mjtto_normalize_claim_birth')) {
+    function mjtto_normalize_claim_birth($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (preg_match('/^(\d{4})[-.\/ ]?(\d{1,2})[-.\/ ]?(\d{1,2})$/', $value, $m)) {
+            $year = (int)$m[1];
+            $month = (int)$m[2];
+            $day = (int)$m[3];
+
+            if (checkdate($month, $day, $year)) {
+                return sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
+        return false;
+    }
+}
+
 if ($action === 'self_done_rank5') {
     mjtto_alert_back('5등 즉시지급 기능은 숨김 처리되었습니다. 당첨자 정보를 입력해 지급요청 후 최고관리자가 완료 처리하세요.', $return_url);
 }
@@ -43,6 +65,7 @@ if ($action === 'request') {
     $issue_item_id = (int)($_POST['issue_item_id'] ?? 0);
     $request_name = trim((string)($_POST['request_name'] ?? ''));
     $request_hp = trim((string)($_POST['request_hp'] ?? ''));
+    $request_birth = mjtto_claim_column_exists('request_birth') ? mjtto_normalize_claim_birth($_POST['request_birth'] ?? '') : '';
     $request_memo = trim((string)($_POST['request_memo'] ?? ''));
 
     if ($issue_item_id < 1) {
@@ -50,6 +73,14 @@ if ($action === 'request') {
     }
     if ($request_name === '' || $request_hp === '') {
         mjtto_alert_back('당첨자명과 휴대폰 번호를 입력해 주세요.', $return_url);
+    }
+    if (mjtto_claim_column_exists('request_birth')) {
+        if ($request_birth === '') {
+            mjtto_alert_back('생년월일을 입력해 주세요.', $return_url);
+        }
+        if ($request_birth === false) {
+            mjtto_alert_back('생년월일 형식이 올바르지 않습니다. 예: 1990-01-01', $return_url);
+        }
     }
 
     $item = sql_fetch("\n        SELECT\n            ii.*,\n            i.issue_no,\n            i.company_id,\n            i.branch_id\n        FROM mz_issue_item ii\n        JOIN mz_issue i\n          ON ii.issue_id = i.issue_id\n        WHERE ii.issue_item_id = '{$issue_item_id}'\n          AND " . mjtto_get_issue_scope_sql($auth, 'i') . "\n        LIMIT 1\n    ");
@@ -84,6 +115,7 @@ if ($action === 'request') {
 
     $request_name_sql = sql_real_escape_string($request_name);
     $request_hp_sql = sql_real_escape_string($request_hp);
+    $request_birth_sql = sql_real_escape_string((string)$request_birth);
     $request_memo_sql = sql_real_escape_string($request_memo);
     $request_by_sql = sql_real_escape_string($member['mb_id']);
     $ticket_no_sql = sql_real_escape_string($item['ticket_no']);
@@ -100,9 +132,9 @@ if ($action === 'request') {
             mjtto_alert_back('이미 지급완료 처리된 건입니다.', $return_url);
         }
 
-        $ok = sql_query("\n            UPDATE mz_prize_claim\n               SET claim_status = 'CLAIM_REQUEST',\n                   request_name = '{$request_name_sql}',\n                   request_hp = '{$request_hp_sql}',\n                   request_memo = '{$request_memo_sql}',\n                   request_by = '{$request_by_sql}',\n                   requested_at = NOW(),\n                   approve_by = '',\n                   approved_at = NULL,\n                   paid_by = '',\n                   paid_at = NULL,\n                   reject_by = '',\n                   rejected_at = NULL,\n                   reject_reason = '',\n                   admin_memo = '',\n                   prize_owner_type = '{$owner_type_sql}',\n                   prize_owner_company_id = " . ($owner_company_id > 0 ? "'{$owner_company_id}'" : 'NULL') . ",\n                   prize_name = '{$prize_name_sql}',\n                   prize_desc = '{$prize_desc_sql}'\n             WHERE claim_id = '".(int)$existing['claim_id']."'\n        ", false);
+        $ok = sql_query("\n            UPDATE mz_prize_claim\n               SET claim_status = 'CLAIM_REQUEST',\n                   request_name = '{$request_name_sql}',\n                   request_hp = '{$request_hp_sql}',\n                   " . (mjtto_claim_column_exists('request_birth') ? "request_birth = '{$request_birth_sql}',\n                   " : '') . "request_memo = '{$request_memo_sql}',\n                   request_by = '{$request_by_sql}',\n                   requested_at = NOW(),\n                   approve_by = '',\n                   approved_at = NULL,\n                   paid_by = '',\n                   paid_at = NULL,\n                   reject_by = '',\n                   rejected_at = NULL,\n                   reject_reason = '',\n                   admin_memo = '',\n                   prize_owner_type = '{$owner_type_sql}',\n                   prize_owner_company_id = " . ($owner_company_id > 0 ? "'{$owner_company_id}'" : 'NULL') . ",\n                   prize_name = '{$prize_name_sql}',\n                   prize_desc = '{$prize_desc_sql}'\n             WHERE claim_id = '".(int)$existing['claim_id']."'\n        ", false);
     } else {
-        $ok = sql_query("\n            INSERT INTO mz_prize_claim\n                SET issue_item_id = '{$issue_item_id}',\n                    issue_id = '".(int)$item['issue_id']."',\n                    company_id = '".(int)$item['company_id']."',\n                    branch_id = '".(int)$item['branch_id']."',\n                    round_no = '".(int)$item['round_no']."',\n                    ticket_no = '{$ticket_no_sql}',\n                    result_rank = '{$result_rank}',\n                    prize_owner_type = '{$owner_type_sql}',\n                    prize_owner_company_id = " . ($owner_company_id > 0 ? "'{$owner_company_id}'" : 'NULL') . ",\n                    prize_name = '{$prize_name_sql}',\n                    prize_desc = '{$prize_desc_sql}',\n                    claim_status = 'CLAIM_REQUEST',\n                    request_name = '{$request_name_sql}',\n                    request_hp = '{$request_hp_sql}',\n                    request_memo = '{$request_memo_sql}',\n                    request_by = '{$request_by_sql}',\n                    requested_at = NOW()\n        ", false);
+        $ok = sql_query("\n            INSERT INTO mz_prize_claim\n                SET issue_item_id = '{$issue_item_id}',\n                    issue_id = '".(int)$item['issue_id']."',\n                    company_id = '".(int)$item['company_id']."',\n                    branch_id = '".(int)$item['branch_id']."',\n                    round_no = '".(int)$item['round_no']."',\n                    ticket_no = '{$ticket_no_sql}',\n                    result_rank = '{$result_rank}',\n                    prize_owner_type = '{$owner_type_sql}',\n                    prize_owner_company_id = " . ($owner_company_id > 0 ? "'{$owner_company_id}'" : 'NULL') . ",\n                    prize_name = '{$prize_name_sql}',\n                    prize_desc = '{$prize_desc_sql}',\n                    claim_status = 'CLAIM_REQUEST',\n                    request_name = '{$request_name_sql}',\n                    request_hp = '{$request_hp_sql}',\n                    " . (mjtto_claim_column_exists('request_birth') ? "request_birth = '{$request_birth_sql}',\n                    " : '') . "request_memo = '{$request_memo_sql}',\n                    request_by = '{$request_by_sql}',\n                    requested_at = NOW()\n        ", false);
     }
 
     if (!$ok) {

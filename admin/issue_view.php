@@ -180,6 +180,7 @@ include_once __DIR__ . '/_admin_head.php';
 .inline-form input{height:34px;padding:0 10px;border:1px solid #d1d5db;border-radius:8px;box-sizing:border-box;}
 .inline-form .w-name{width:110px;}
 .inline-form .w-hp{width:130px;}
+.inline-form .w-birth{width:140px;}
 .inline-form .w-memo{width:180px;}
 .action-group{display:flex;flex-wrap:wrap;gap:6px;}
 .notice{padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;color:#4b5563;line-height:1.7;margin-bottom:16px;}
@@ -317,6 +318,7 @@ include_once __DIR__ . '/_admin_head.php';
                     <?php if ($claim) { ?>
                         <span class="badge <?php echo mjtto_claim_badge_class($claim['claim_status']); ?>"><?php echo get_text(mjtto_claim_status_name($claim['claim_status'])); ?></span>
                         <div class="sub">요청자: <?php echo get_text($claim['request_by']); ?></div>
+                        <?php if (!empty($claim['request_birth'])) { ?><div class="sub">생년월일: <?php echo get_text($claim['request_birth']); ?></div><?php } ?>
                         <?php if ($claim['requested_at']) { ?><div class="sub">요청일: <?php echo get_text($claim['requested_at']); ?></div><?php } ?>
                         <?php if ($claim['paid_at']) { ?><div class="sub">지급일: <?php echo get_text($claim['paid_at']); ?></div><?php } ?>
                         <?php if ($claim['reject_reason']) { ?><div class="sub">사유: <?php echo get_text($claim['reject_reason']); ?></div><?php } ?>
@@ -332,6 +334,7 @@ include_once __DIR__ . '/_admin_head.php';
                             <input type="hidden" name="return_url" value="<?php echo get_text($return_url); ?>">
                             <input type="text" name="request_name" value="<?php echo get_text($row['customer_name']); ?>" class="w-name" placeholder="당첨자명" required>
                             <input type="text" name="request_hp" value="<?php echo get_text($row['customer_hp']); ?>" class="w-hp" placeholder="휴대폰" required>
+                            <?php if (mjtto_claim_column_exists('request_birth')) { ?><input type="text" name="request_birth" value="<?php echo get_text($claim['request_birth'] ?? ''); ?>" class="w-birth" placeholder="생년월일 1990-01-01" required><?php } ?>
                             <input type="text" name="request_memo" value="" class="w-memo" placeholder="메모(선택)">
                             <button type="submit" class="btn btn-save">지급요청 등록</button>
                         </form>                    <?php } elseif ($claim) { ?>

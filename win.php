@@ -15,6 +15,34 @@ function mjtto_is_valid_claim_hp($value){
     return preg_match('/^01[0-9]{8,9}$/', (string)$value) === 1;
 }
 
+function mjtto_normalize_birth_part($value, $length){
+    $value = preg_replace('/[^0-9]/', '', (string)$value);
+    return substr($value, 0, (int)$length);
+}
+
+function mjtto_build_claim_birth($year, $month, $day){
+    $year = mjtto_normalize_birth_part($year, 4);
+    $month = mjtto_normalize_birth_part($month, 2);
+    $day = mjtto_normalize_birth_part($day, 2);
+
+    if ($year === '' && $month === '' && $day === '') {
+        return '';
+    }
+
+    if (strlen($year) !== 4 || $month === '' || $day === '') {
+        return false;
+    }
+
+    $month = str_pad($month, 2, '0', STR_PAD_LEFT);
+    $day = str_pad($day, 2, '0', STR_PAD_LEFT);
+
+    if (!checkdate((int)$month, (int)$day, (int)$year)) {
+        return false;
+    }
+
+    return $year . '-' . $month . '-' . $day;
+}
+
 $ticket_no = isset($_GET['no']) ? trim((string)$_GET['no']) : '';
 if ($ticket_no === '') {
     die('잘못된 접근입니다.');
@@ -189,6 +217,7 @@ $request_rank_map = array();
 $request_item_meta_map = array();
 $request_claim_name = '';
 $request_claim_hp = '';
+$request_claim_birth = '';
 $issue_scope_row = array(
     'issue_id' => $issue_id,
     'company_id' => (int)$base_item['contract_company_id'],
@@ -294,6 +323,9 @@ foreach ($page_items as $idx => $row) {
             if ($request_claim_hp === '' && trim((string)$row['customer_hp']) !== '') {
                 $request_claim_hp = trim((string)$row['customer_hp']);
             }
+            if ($request_claim_birth === '' && !empty($claim['request_birth'])) {
+                $request_claim_birth = trim((string)$claim['request_birth']);
+            }
         } elseif (!$claim && $deadline_expired) {
             $request_block_reason = $deadline_message;
         }
@@ -356,6 +388,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $customer_name = trim((string)($_POST['customer_name'] ?? ''));
             $customer_hp = mjtto_normalize_claim_hp($_POST['customer_hp'] ?? '');
+            $customer_birth = mjtto_build_claim_birth($_POST['customer_birth_year'] ?? '', $_POST['customer_birth_month'] ?? '', $_POST['customer_birth_day'] ?? '');
+            $privacy_agree = !empty($_POST['privacy_agree']);
 
             if ($customer_name === '') {
                 $error_msg = '당첨자 이름을 입력하세요.';
@@ -363,9 +397,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error_msg = '휴대폰번호를 입력하세요.';
             } elseif (!mjtto_is_valid_claim_hp($customer_hp)) {
                 $error_msg = '휴대폰번호 형식이 올바르지 않습니다.';
+            } elseif ($customer_birth === '') {
+                $error_msg = '생년월일을 입력하세요.';
+            } elseif ($customer_birth === false) {
+                $error_msg = '생년월일 형식이 올바르지 않습니다.';
+            } elseif (!$privacy_agree) {
+                $error_msg = '개인정보 수집 및 마케팅 활용 동의가 필요합니다.';
             } else {
                 $customer_name_sql = sql_real_escape_string($customer_name);
                 $customer_hp_sql = sql_real_escape_string($customer_hp);
+                $customer_birth_sql = sql_real_escape_string($customer_birth);
                 $request_ids_sql = implode(',', array_map('intval', $request_item_ids));
                 $request_by = !empty($member['mb_id']) ? trim((string)$member['mb_id']) : '';
                 $request_by_sql = sql_real_escape_string($request_by);
@@ -403,9 +444,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
 
                         if (!empty($exists_claim['claim_id'])) {
-                            $claim_sql = "\n                                UPDATE mz_prize_claim\n                                   SET claim_status = 'CLAIM_REQUEST',\n                                       request_name = '{$customer_name_sql}',\n                                       request_hp = '{$customer_hp_sql}',\n                                       request_memo = '',\n                                       request_by = '{$request_by_sql}',\n                                       requested_at = NOW(),\n                                       approve_by = '',\n                                       approved_at = NULL,\n                                       paid_by = '',\n                                       paid_at = NULL,\n                                       reject_by = '',\n                                       rejected_at = NULL,\n                                       reject_reason = '',\n                                       admin_memo = '',\n                                       prize_owner_type = '{$owner_type_sql}',\n                                       prize_owner_company_id = " . ($owner_company_id_value > 0 ? "'{$owner_company_id_value}'" : 'NULL') . ",\n                                       prize_name = '{$prize_name_sql}',\n                                       prize_desc = '{$prize_desc_sql}'\n                                 WHERE claim_id = '".(int)$exists_claim['claim_id']."'\n                            ";
+                            $claim_sql = "\n                                UPDATE mz_prize_claim\n                                   SET claim_status = 'CLAIM_REQUEST',\n                                       request_name = '{$customer_name_sql}',\n                                       request_hp = '{$customer_hp_sql}',\n                                       " . (mjtto_claim_column_exists('request_birth') ? "request_birth = '{$customer_birth_sql}',\n                                       " : '') . "request_memo = '',\n                                       request_by = '{$request_by_sql}',\n                                       requested_at = NOW(),\n                                       approve_by = '',\n                                       approved_at = NULL,\n                                       paid_by = '',\n                                       paid_at = NULL,\n                                       reject_by = '',\n                                       rejected_at = NULL,\n                                       reject_reason = '',\n                                       admin_memo = '',\n                                       prize_owner_type = '{$owner_type_sql}',\n                                       prize_owner_company_id = " . ($owner_company_id_value > 0 ? "'{$owner_company_id_value}'" : 'NULL') . ",\n                                       prize_name = '{$prize_name_sql}',\n                                       prize_desc = '{$prize_desc_sql}'\n                                 WHERE claim_id = '".(int)$exists_claim['claim_id']."'\n                            ";
                         } else {
-                            $claim_sql = "\n                                INSERT INTO mz_prize_claim\n                                    SET issue_item_id = '{$request_item_id}',\n                                        issue_id = '{$issue_id}',\n                                        company_id = '".(int)$base_item['contract_company_id']."',\n                                        branch_id = '".(int)$base_item['branch_id']."',\n                                        round_no = '".(int)$base_item['round_no']."',\n                                        ticket_no = '{$ticket_no_sql}',\n                                        result_rank = '{$result_rank_value}',\n                                        prize_owner_type = '{$owner_type_sql}',\n                                        prize_owner_company_id = " . ($owner_company_id_value > 0 ? "'{$owner_company_id_value}'" : 'NULL') . ",\n                                        prize_name = '{$prize_name_sql}',\n                                        prize_desc = '{$prize_desc_sql}',\n                                        claim_status = 'CLAIM_REQUEST',\n                                        request_name = '{$customer_name_sql}',\n                                        request_hp = '{$customer_hp_sql}',\n                                        request_memo = '',\n                                        request_by = '{$request_by_sql}',\n                                        requested_at = NOW()\n                            ";
+                            $claim_sql = "\n                                INSERT INTO mz_prize_claim\n                                    SET issue_item_id = '{$request_item_id}',\n                                        issue_id = '{$issue_id}',\n                                        company_id = '".(int)$base_item['contract_company_id']."',\n                                        branch_id = '".(int)$base_item['branch_id']."',\n                                        round_no = '".(int)$base_item['round_no']."',\n                                        ticket_no = '{$ticket_no_sql}',\n                                        result_rank = '{$result_rank_value}',\n                                        prize_owner_type = '{$owner_type_sql}',\n                                        prize_owner_company_id = " . ($owner_company_id_value > 0 ? "'{$owner_company_id_value}'" : 'NULL') . ",\n                                        prize_name = '{$prize_name_sql}',\n                                        prize_desc = '{$prize_desc_sql}',\n                                        claim_status = 'CLAIM_REQUEST',\n                                        request_name = '{$customer_name_sql}',\n                                        request_hp = '{$customer_hp_sql}',\n                                        " . (mjtto_claim_column_exists('request_birth') ? "request_birth = '{$customer_birth_sql}',\n                                        " : '') . "request_memo = '',\n                                        request_by = '{$request_by_sql}',\n                                        requested_at = NOW()\n                            ";
                         }
 
                         if (!sql_query($claim_sql, false)) {
@@ -446,6 +487,27 @@ if (isset($_GET['saved']) && $_GET['saved'] === '1') {
             }
         }
     }
+}
+
+if ($error_msg !== '' && $_SERVER['REQUEST_METHOD'] === 'POST' && $post_action === 'save_claimant') {
+    $request_claim_name = trim((string)($_POST['customer_name'] ?? ''));
+    $request_claim_hp = trim((string)($_POST['customer_hp'] ?? ''));
+}
+
+$request_claim_birth_year = '';
+$request_claim_birth_month = '';
+$request_claim_birth_day = '';
+$privacy_agree_checked = false;
+if ($request_claim_birth !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $request_claim_birth, $birth_matches)) {
+    $request_claim_birth_year = $birth_matches[1];
+    $request_claim_birth_month = $birth_matches[2];
+    $request_claim_birth_day = $birth_matches[3];
+}
+if ($error_msg !== '' && $_SERVER['REQUEST_METHOD'] === 'POST' && $post_action === 'save_claimant') {
+    $request_claim_birth_year = mjtto_normalize_birth_part($_POST['customer_birth_year'] ?? '', 4);
+    $request_claim_birth_month = mjtto_normalize_birth_part($_POST['customer_birth_month'] ?? '', 2);
+    $request_claim_birth_day = mjtto_normalize_birth_part($_POST['customer_birth_day'] ?? '', 2);
+    $privacy_agree_checked = !empty($_POST['privacy_agree']);
 }
 
 $company_line_1 = trim((string)$base_item['branch_print_name_1']) !== '' ? trim((string)$base_item['branch_print_name_1']) : trim((string)$base_item['contract_print_name_1']);
@@ -496,6 +558,13 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
 .jump-link:hover{text-decoration:none;background:#ffedd5;}
 .input{width:100%;height:44px;padding:0 12px;border:1px solid #d1d5db;border-radius:10px;box-sizing:border-box;font-size:15px;}
 .form-row{margin-bottom:12px;}
+.birth-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.agree-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;line-height:1.6;}
+.agree-row input{margin:0;}
+.agree-view-btn{display:inline-block;border:0;background:none;color:#2563eb;font-size:14px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline;}
+.agree-detail{display:none;margin-top:10px;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa;font-size:13px;line-height:1.8;white-space:pre-line;color:#374151;}
+.agree-detail.is-open{display:block;}
+.input.input-hint{color:#9ca3af;}
 .btn{display:inline-block;height:46px;line-height:46px;padding:0 18px;border:0;border-radius:10px;background:#111827;color:#fff;font-size:15px;cursor:pointer;text-decoration:none;}
 .btn.small{height:38px;line-height:38px;padding:0 14px;font-size:14px;}
 .action-row{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
@@ -629,10 +698,13 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
     <?php if ($draw_ready && $has_request_winner) { ?>
     <div class="box" id="claim-request-form">
         <div style="font-weight:700;margin-bottom:8px;">당첨자 정보 접수</div>
-        <?php if ($request_claim_name !== '' || $request_claim_hp !== '') { ?>
+        <?php if ($request_claim_name !== '' || $request_claim_hp !== '' || $request_claim_birth !== '') { ?>
             <table class="table" style="margin-bottom:16px;">
                 <tr><th>당첨자 이름</th><td><?php echo mjtto_h($request_claim_name); ?></td></tr>
                 <tr><th>휴대폰번호</th><td><?php echo mjtto_h($request_claim_hp); ?></td></tr>
+                <?php if ($request_claim_birth !== '') { ?>
+                <tr><th>생년월일</th><td><?php echo mjtto_h($request_claim_birth); ?></td></tr>
+                <?php } ?>
             </table>
         <?php } ?>
         <form method="post" action="./win.php?no=<?php echo urlencode($ticket_no); ?>">
@@ -643,10 +715,52 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
             <div class="form-row">
                 <input type="text" name="customer_hp" class="input" placeholder="휴대폰번호" value="<?php echo mjtto_h($request_claim_hp); ?>" maxlength="20" required>
             </div>
+            <div class="form-row birth-row">
+                <input type="text" name="customer_birth_year" class="input<?php echo $request_claim_birth_year === '' ? ' input-hint' : ''; ?>" value="<?php echo mjtto_h($request_claim_birth_year !== '' ? $request_claim_birth_year : '1990'); ?>" data-hint-value="1990" inputmode="numeric" maxlength="4" required>
+                <input type="text" name="customer_birth_month" class="input<?php echo $request_claim_birth_month === '' ? ' input-hint' : ''; ?>" value="<?php echo mjtto_h($request_claim_birth_month !== '' ? $request_claim_birth_month : '01'); ?>" data-hint-value="01" inputmode="numeric" maxlength="2" required>
+                <input type="text" name="customer_birth_day" class="input<?php echo $request_claim_birth_day === '' ? ' input-hint' : ''; ?>" value="<?php echo mjtto_h($request_claim_birth_day !== '' ? $request_claim_birth_day : '01'); ?>" data-hint-value="01" inputmode="numeric" maxlength="2" required>
+            </div>
+            <div class="form-row">
+                <div class="agree-row">
+                    <label><input type="checkbox" name="privacy_agree" value="1" required<?php echo $privacy_agree_checked ? ' checked' : ''; ?>> 당첨자 정보 접수</label>
+                    <button type="button" class="agree-view-btn" data-agree-toggle>내용보기</button>
+                </div>
+                <div class="agree-detail" data-agree-detail>와이즈피플코리아(이하 "당사"라 함)는 귀하의 개인정보를 매우 중요하게 생각하며, 「개인정보보호법」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」 등 관련 법령을 준수하고 있습니다. 당사는 매주또 행운권 무료증정 이벤트 광고 양식을 통해 수집되는 개인정보의 수집, 이용 및 제3자 제공 목적을 아래와 같이 안내해 드립니다.
+
+1. 개인정보 수집 및 이용 주체
+수집 주체: 와이즈피플코리아
+당사는 매주또 서비스 안내 및 보험 환급금 찾기 무료 상담을 목적으로 고객님의 개인정보를 직접 수집합니다.
+
+2. 수집하는 개인정보 항목 및 수집 방법
+수집 항목: 이름, 휴대전화번호, 생년월일
+수집 방법: 매주또 행운권 당첨자 잠재 고객 확보 양식(인스턴트 양식)을 통한 고객의 자발적 입력 및 제출
+
+3. 개인정보의 수집 및 이용 목적
+- 당첨자 확인 경품서비스 안내 배송
+- 고객 상담 접수 및 본인 확인
+- 보험 상품 소개, 보장 분석, 가입 권유 및 맞춤형 재무설계
+- 이벤트 안내 및 마케팅 자료 활용
+
+4. 개인정보의 제3자 제공
+당사는 수집한 개인정보를 원활한 경품 지급상담 및 맞춤형 금융서비스 제공을 위하여, 아래와 같이 제3자(제휴 보험대리점)에게 제공합니다. 양식을 제출하시는 것은 본 제3자 제공에 동의하는 것으로 간주됩니다.
+- 제공받는 자: (주)영진에셋, 글로벌금융, HK금융파트너스
+- 제공 목적: 보험 상품 소개, 맞춤형 재무설계, TM(텔레마케팅) 상담 및 관련 영업 안내
+- 제공 항목: 이름, 휴대전화번호, 생년월일 등 수집된 정보 일체
+- 보유 및 이용 기간: 제공받은 날로부터 1년
+
+5. 개인정보의 보유 및 이용 기간
+수집된 개인정보는 동의일로부터 1년간 보유 및 이용됩니다. 원칙적으로 개인정보 수집 및 이용 목적이 달성된 후, 또는 보유 기간(1년)이 경과한 후에는 해당 정보를 지체 없이 복구 불가능한 방법으로 파기합니다. (단, 관련 법령에 의해 보존할 필요가 있는 경우 해당 법령에서 정한 기간 동안 보관합니다.)
+
+6. 동의를 거부할 권리 및 거부 시 불이익
+귀하는 개인정보 수집·이용 및 제3자 제공에 대한 동의를 거부할 권리가 있습니다. 단, 동의를 거부하실 경우 매주또 행운권을 통한 경품 지급 본인 확인 상담 및 맞춤형 보험 안내 서비스 제공이 제한될 수 있습니다.
+
+7. 개인정보 보호 문의
+본 양식을 통해 제출된 개인정보의 삭제, 처리 정지, 제3자 제공 동의 철회 등을 원하실 경우, 당사 고객센터 1661-5022(광고 관리자)를 통해 요청해 주시면 지체 없이 조치하겠습니다.</div>
+            </div>
             <button type="submit" class="btn">지급요청 접수</button>
         </form>
         <div class="meta" style="margin-top:10px;">
-            이 장의 1~5등 당첨 게임은 모두 이름과 휴대폰번호를 입력해 지급요청할 수 있습니다.
+            이 장의 1~5등 당첨 게임은 모두 이름, 휴대폰번호, 생년월일을 입력해 지급요청할 수 있습니다.
         </div>
     </div>
     <?php } elseif ($draw_ready && $has_winner) { ?>
@@ -655,5 +769,55 @@ body{font-family:Arial,Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#
     </div>
     <?php } ?>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var agreeToggle = document.querySelector('[data-agree-toggle]');
+    var agreeDetail = document.querySelector('[data-agree-detail]');
+    var hintInputs = document.querySelectorAll('[data-hint-value]');
+
+    if (agreeToggle && agreeDetail) {
+        agreeToggle.addEventListener('click', function () {
+            agreeDetail.classList.toggle('is-open');
+        });
+    }
+
+    hintInputs.forEach(function (input) {
+        var hintValue = input.getAttribute('data-hint-value') || '';
+
+        if (input.value === hintValue) {
+            input.classList.add('input-hint');
+        }
+
+        input.addEventListener('focus', function () {
+            if (input.value === hintValue) {
+                input.value = '';
+                input.classList.remove('input-hint');
+            }
+        });
+
+        input.addEventListener('blur', function () {
+            if (input.value === '') {
+                input.value = hintValue;
+                input.classList.add('input-hint');
+            } else {
+                input.classList.remove('input-hint');
+            }
+        });
+    });
+
+    var claimForm = document.querySelector('#claim-request-form form');
+    if (claimForm) {
+        claimForm.addEventListener('submit', function () {
+            hintInputs.forEach(function (input) {
+                var hintValue = input.getAttribute('data-hint-value') || '';
+                if (input.value === hintValue) {
+                    input.value = '';
+                    input.classList.remove('input-hint');
+                }
+            });
+        });
+    }
+});
+</script>
 </body>
 </html>

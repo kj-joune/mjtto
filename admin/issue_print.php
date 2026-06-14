@@ -114,6 +114,7 @@ $company_line_1 = trim($issue['branch_print_name_1']) !== '' ? trim($issue['bran
 if ($company_line_1 === '') {
     $company_line_1 = trim($issue['contract_name']);
 }
+$company_line_1 = str_replace('||', "\n", $company_line_1);
 $company_line_2 = trim($issue['branch_print_name_2']) !== '' ? trim($issue['branch_print_name_2']) : trim($issue['branch_name']);
 $company_tel = trim($issue['branch_tel_no']) !== '' ? trim($issue['branch_tel_no']) : trim($issue['contract_tel_no']);
 
@@ -141,7 +142,8 @@ body{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:3.0mm;}
 .company{flex:1;padding-top:2.2mm;min-height:22mm;display:flex;flex-direction:column;justify-content:flex-start;gap:0.45mm;}
 .company .line1,.company .line2,.company .tel{font-size:4.5mm;line-height:1.25;font-weight:550;letter-spacing:0.05mm;word-break:keep-all;}
-.company .tel{margin-top:0.1mm;white-space:nowrap;}
+.company .line1{white-space:pre-line;}
+.company .tel{margin-top:0.7mm;white-space:nowrap;}
 .qr{width:22mm;flex:0 0 22mm;display:flex;justify-content:flex-end;align-items:flex-start;}
 .qr img{display:block;width:22mm;height:22mm;}
 .title{margin:2.4mm 0 2.4mm;text-align:center;font-size:5.15mm;line-height:1.08;font-weight:900;letter-spacing:-0.10mm;word-break:keep-all;}

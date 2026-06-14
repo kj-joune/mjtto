@@ -135,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($company_name === '') alert('지점명을 입력하세요.');
-    if (mjtto_utf8_len($print_name_1) > 9) alert('복권 표기명 1행은 한글 기준 9자까지만 입력할 수 있습니다.');
-    if (mjtto_utf8_len($print_name_2) > 9) alert('복권 표기명 2행은 한글 기준 9자까지만 입력할 수 있습니다.');
+    if (mjtto_utf8_len($print_name_1) > 20) alert('복권 표기명 1행은 한글 기준 20자까지만 입력할 수 있습니다.');
+    if (mjtto_utf8_len($print_name_2) > 10) alert('복권 표기명 2행은 한글 기준 10자까지만 입력할 수 있습니다.');
     if ($admin_mb_id === '') alert('관리자 아이디를 입력하세요.');
     if (!preg_match('/^[a-zA-Z0-9_]+$/', $admin_mb_id)) alert('관리자 아이디는 영문, 숫자, _ 만 사용할 수 있습니다.');
     if ($admin_name === '') alert('관리자 이름을 입력하세요.');
@@ -289,8 +289,8 @@ include_once __DIR__ . '/_admin_head.php';
             <tr><th>상위 제휴사</th><td><span class="readonly-box"><?php echo get_text($contract_company_name); ?> (<?php echo get_text($contract_company_code); ?>)</span></td></tr>
             <tr><th>지점명</th><td><textarea name="company_name" class="input" style="height:72px;padding:10px 12px;" maxlength="100" required><?php echo get_text($write['company_name']); ?></textarea><div class="desc">관리용 지점명입니다. 줄바꿈 입력 가능합니다.</div></td></tr>
             <tr><th>발권당 게임수</th><td><select name="issue_game_count" class="input" style="max-width:140px;" required><?php for ($g = 5; $g >= 1; $g--) { ?><option value="<?php echo $g; ?>" <?php echo ((int)$write['issue_game_count'] === $g) ? 'selected' : ''; ?>><?php echo $g; ?>게임</option><?php } ?></select><div class="desc">실제 발권 시 1장당 생성할 게임 수입니다.</div></td></tr>
-            <tr><th>복권 표기명 1행</th><td><input type="text" name="print_name_1" value="<?php echo get_text($write['print_name_1']); ?>" class="input" maxlength="8"><div class="desc">복권 상단 첫 줄에 출력됩니다. 한글 기준 9자까지만 입력할 수 있습니다.</div></td></tr>
-            <tr><th>복권 표기명 2행</th><td><input type="text" name="print_name_2" value="<?php echo get_text($write['print_name_2']); ?>" class="input" maxlength="8"><div class="desc">한글 기준 9자까지만 입력할 수 있습니다.</div></td></tr>
+            <tr><th>복권 표기명 1행</th><td><input type="text" name="print_name_1" value="<?php echo get_text($write['print_name_1']); ?>" class="input" maxlength="20"><div class="desc">복권 상단 첫 줄에 출력됩니다. 한글 기준 20자까지만 입력할 수 있습니다. <strong>||</strong> 를 넣으면 인쇄 시 다음 줄로 강제 분리됩니다</div></td></tr>
+            <tr><th>복권 표기명 2행</th><td><input type="text" name="print_name_2" value="<?php echo get_text($write['print_name_2']); ?>" class="input" maxlength="10"><div class="desc">한글 기준 10자까지만 입력할 수 있습니다.</div></td></tr>
             <tr><th>복권 연락처</th><td><input type="text" name="tel_no" value="<?php echo get_text($write['tel_no']); ?>" class="input" maxlength="30"></td></tr>
             <tr><th>지점코드</th><td><span class="readonly-box"><?php echo $is_update ? get_text($write['company_code']) : '저장 시 자동 생성'; ?></span></td></tr>
             <tr><th>쿠폰구분자</th><td><span class="readonly-box"><?php echo $is_update ? get_text($write['coupon_prefix']) : '지점코드와 동일하게 자동 생성'; ?></span></td></tr>
@@ -346,12 +346,15 @@ include_once __DIR__ . '/_admin_head.php';
 </div>
 <script>
 (function(){
-    ['print_name_1', 'print_name_2'].forEach(function(name){
-        var field = document.querySelector('[name="' + name + '"]');
+    [
+        {name: 'print_name_1', max: 20},
+        {name: 'print_name_2', max: 10}
+    ].forEach(function(rule){
+        var field = document.querySelector('[name="' + rule.name + '"]');
         if (!field) return;
         field.addEventListener('input', function(){
-            if (field.value.length > 8) {
-                field.value = field.value.slice(0, 8);
+            if (field.value.length > rule.max) {
+                field.value = field.value.slice(0, rule.max);
             }
         });
     });
