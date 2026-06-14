@@ -103,6 +103,7 @@ $query_params = array(
 );
 $qstr = http_build_query($query_params);
 $return_url = './claim_list.php' . ($qstr !== '' ? '?' . $qstr . '&page=' . $page : '?page=' . $page);
+$can_claim_excel_download = in_array($auth['role'], array('SUPER_ADMIN', 'COMPANY_ADMIN'), true);
 
 $active_filters = array();
 if ($round_no > 0) $active_filters[] = $round_no . '회';
@@ -205,6 +206,7 @@ include_once __DIR__ . '/_admin_head.php';
         <div class="action-group">
             <button type="submit" class="btn btn-primary">검색</button>
             <a href="./claim_list.php" class="btn btn-light">초기화</a>
+            <?php if ($can_claim_excel_download) { ?><button type="submit" formaction="./claim_excel.php" class="btn btn-light">엑셀저장</button><?php } ?>
         </div>
     </form>
 
