@@ -5,6 +5,56 @@ include_once __DIR__ . '/_admin_common.php';
 
 $auth = mjtto_require_admin();
 
+if (!function_exists('mjtto_mask_claim_name')) {
+    function mjtto_mask_claim_name($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            $len = (int)mb_strlen($value, 'UTF-8');
+            if ($len <= 1) return '*';
+            if ($len === 2) return mb_substr($value, 0, 1, 'UTF-8') . '*';
+            return mb_substr($value, 0, 1, 'UTF-8') . str_repeat('*', $len - 2) . mb_substr($value, -1, 1, 'UTF-8');
+        }
+
+        if (preg_match_all('/./us', $value, $matches)) {
+            $chars = $matches[0];
+            $len = count($chars);
+            if ($len <= 1) return '*';
+            if ($len === 2) return $chars[0] . '*';
+            return $chars[0] . str_repeat('*', $len - 2) . $chars[$len - 1];
+        }
+
+        $len = strlen($value);
+        if ($len <= 1) return '*';
+        if ($len === 2) return substr($value, 0, 1) . '*';
+        return substr($value, 0, 1) . str_repeat('*', $len - 2) . substr($value, -1);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_hp')) {
+    function mjtto_mask_claim_hp($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        $len = strlen($digits);
+        if ($len === 0) return '';
+        if ($len <= 4) return str_repeat('*', $len);
+        if ($len <= 7) return substr($digits, 0, 3) . str_repeat('*', $len - 3);
+        return substr($digits, 0, 3) . str_repeat('*', $len - 7) . substr($digits, -4);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_birth')) {
+    function mjtto_mask_claim_birth($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        if ($digits === '') return '';
+        if (strlen($digits) < 4) return str_repeat('*', strlen($digits));
+        return substr($digits, 0, 2) . '**-**-' . substr($digits, -2);
+    }
+}
+
 if (!function_exists('mjtto_issue_list_round_status_text')) {
     function mjtto_issue_list_round_status_text($round_status, $draw_date)
     {
@@ -81,6 +131,7 @@ $contract_options = mjtto_get_accessible_contracts($auth);
 $branch_options = mjtto_get_accessible_branches($auth, $company_filter);
 $show_contract_filter = in_array($auth['role'], array('SUPER_ADMIN', 'COMPANY_ADMIN'), true);
 $show_branch_filter = in_array($auth['role'], array('SUPER_ADMIN', 'COMPANY_ADMIN'), true);
+$can_view_claim_private_info = ($auth['role'] === 'SUPER_ADMIN');
 
 $sql_search = "
     WHERE {$scope_sql}
@@ -642,6 +693,8 @@ include_once __DIR__ . '/_admin_head.php';
                 $issue_game_count = (int)$row['issue_game_count'];
                 if ($issue_game_count < 1) $issue_game_count = 5;
                 $game_qty = $issue_qty * $issue_game_count;
+                $customer_name = $can_view_claim_private_info ? (string)$row['customer_name'] : mjtto_mask_claim_name($row['customer_name']);
+                $customer_hp = $can_view_claim_private_info ? (string)$row['customer_hp'] : mjtto_mask_claim_hp($row['customer_hp']);
             ?>
                 <tr>
                     <td><?php echo $number; ?></td>
@@ -650,7 +703,7 @@ include_once __DIR__ . '/_admin_head.php';
                         <div class="meta-value"><?php echo get_text($row['issue_no']); ?></div>
                         <div class="meta-sub">상태: <?php echo get_text($row['issue_status']); ?></div>
                         <?php if ($row['customer_name'] || $row['customer_hp']) { ?>
-                        <div class="meta-sub">최근 당첨자: <?php echo get_text($row['customer_name']); ?><?php echo $row['customer_hp'] ? ' (' . get_text($row['customer_hp']) . ')' : ''; ?></div>
+                        <div class="meta-sub">최근 당첨자: <?php echo get_text($customer_name); ?><?php echo $customer_hp !== '' ? ' (' . get_text($customer_hp) . ')' : ''; ?></div>
                         <?php } ?>
                     </td>
                     <td>

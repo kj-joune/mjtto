@@ -46,8 +46,8 @@ if ($auth['role'] === 'SUPER_ADMIN') {
 
         $owner_type = 'COMPANY';
         $owner_company_id = (int)$selected_company['company_id'];
-        $allowed_ranks = array(3, 4, 5);
-        $readonly_ranks = array(1, 2);
+        $allowed_ranks = array(1, 2, 3, 4, 5);
+        $readonly_ranks = array();
         $title_label = '제휴사별 경품 설정 - ' . trim((string)$selected_company['company_name']);
         $return_query['company_id'] = $owner_company_id;
     } else {
@@ -100,8 +100,8 @@ while ($res_latest && ($row = sql_fetch_array($res_latest))) {
 
 $scope_company_id = 0;
 $scope_branch_id = 0;
-if ($auth['role'] === 'COMPANY_ADMIN') {
-    $scope_company_id = (int)$auth['company_id'];
+if ($owner_type === 'COMPANY') {
+    $scope_company_id = (int)$owner_company_id;
 } elseif ($auth['role'] === 'BRANCH_ADMIN') {
     $scope_branch_id = (int)$auth['company_id'];
 }

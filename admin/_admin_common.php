@@ -113,6 +113,56 @@ if (!function_exists('mjtto_role_name')) {
     }
 }
 
+if (!function_exists('mjtto_mask_claim_name')) {
+    function mjtto_mask_claim_name($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            $len = (int)mb_strlen($value, 'UTF-8');
+            if ($len <= 1) return '*';
+            if ($len === 2) return mb_substr($value, 0, 1, 'UTF-8') . '*';
+            return mb_substr($value, 0, 1, 'UTF-8') . str_repeat('*', $len - 2) . mb_substr($value, -1, 1, 'UTF-8');
+        }
+
+        if (preg_match_all('/./us', $value, $matches)) {
+            $chars = $matches[0];
+            $len = count($chars);
+            if ($len <= 1) return '*';
+            if ($len === 2) return $chars[0] . '*';
+            return $chars[0] . str_repeat('*', $len - 2) . $chars[$len - 1];
+        }
+
+        $len = strlen($value);
+        if ($len <= 1) return '*';
+        if ($len === 2) return substr($value, 0, 1) . '*';
+        return substr($value, 0, 1) . str_repeat('*', $len - 2) . substr($value, -1);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_hp')) {
+    function mjtto_mask_claim_hp($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        $len = strlen($digits);
+        if ($len === 0) return '';
+        if ($len <= 4) return str_repeat('*', $len);
+        if ($len <= 7) return substr($digits, 0, 3) . str_repeat('*', $len - 3);
+        return substr($digits, 0, 3) . str_repeat('*', $len - 7) . substr($digits, -4);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_birth')) {
+    function mjtto_mask_claim_birth($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        if ($digits === '') return '';
+        if (strlen($digits) < 4) return str_repeat('*', strlen($digits));
+        return substr($digits, 0, 2) . '**-**-' . substr($digits, -2);
+    }
+}
+
 if (!function_exists('mjtto_list_url')) {
     function mjtto_list_url($role, $script_name = '')
     {

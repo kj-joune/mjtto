@@ -9,6 +9,56 @@ if (!mjtto_claim_table_exists()) {
     alert('mz_prize_claim 테이블이 없습니다. SQL 패치를 먼저 적용해 주세요.', './index.php');
 }
 
+if (!function_exists('mjtto_mask_claim_name')) {
+    function mjtto_mask_claim_name($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            $len = (int)mb_strlen($value, 'UTF-8');
+            if ($len <= 1) return '*';
+            if ($len === 2) return mb_substr($value, 0, 1, 'UTF-8') . '*';
+            return mb_substr($value, 0, 1, 'UTF-8') . str_repeat('*', $len - 2) . mb_substr($value, -1, 1, 'UTF-8');
+        }
+
+        if (preg_match_all('/./us', $value, $matches)) {
+            $chars = $matches[0];
+            $len = count($chars);
+            if ($len <= 1) return '*';
+            if ($len === 2) return $chars[0] . '*';
+            return $chars[0] . str_repeat('*', $len - 2) . $chars[$len - 1];
+        }
+
+        $len = strlen($value);
+        if ($len <= 1) return '*';
+        if ($len === 2) return substr($value, 0, 1) . '*';
+        return substr($value, 0, 1) . str_repeat('*', $len - 2) . substr($value, -1);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_hp')) {
+    function mjtto_mask_claim_hp($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        $len = strlen($digits);
+        if ($len === 0) return '';
+        if ($len <= 4) return str_repeat('*', $len);
+        if ($len <= 7) return substr($digits, 0, 3) . str_repeat('*', $len - 3);
+        return substr($digits, 0, 3) . str_repeat('*', $len - 7) . substr($digits, -4);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_birth')) {
+    function mjtto_mask_claim_birth($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        if ($digits === '') return '';
+        if (strlen($digits) < 4) return str_repeat('*', strlen($digits));
+        return substr($digits, 0, 2) . '**-**-' . substr($digits, -2);
+    }
+}
+
 $scope_sql = mjtto_get_claim_scope_sql($auth, 'pc');
 $reward_ticket_column = '';
 if (mjtto_claim_column_exists('reward_ticket_no')) {
@@ -103,7 +153,8 @@ $query_params = array(
 );
 $qstr = http_build_query($query_params);
 $return_url = './claim_list.php' . ($qstr !== '' ? '?' . $qstr . '&page=' . $page : '?page=' . $page);
-$can_claim_excel_download = in_array($auth['role'], array('SUPER_ADMIN', 'COMPANY_ADMIN'), true);
+$can_view_claim_private_info = ($auth['role'] === 'SUPER_ADMIN');
+$can_claim_excel_download = $can_view_claim_private_info;
 
 $active_filters = array();
 if ($round_no > 0) $active_filters[] = $round_no . '회';
@@ -248,6 +299,10 @@ include_once __DIR__ . '/_admin_head.php';
             while ($row = sql_fetch_array($result)) {
                 $i++;
                 $actions = mjtto_claim_allowed_actions($auth, $row);
+                $request_name = $can_view_claim_private_info ? (string)$row['request_name'] : mjtto_mask_claim_name($row['request_name']);
+                $request_hp = $can_view_claim_private_info ? (string)$row['request_hp'] : mjtto_mask_claim_hp($row['request_hp']);
+                $request_birth = $has_request_birth_column ? (string)($row['request_birth'] ?? '') : '';
+                $request_birth_display = $can_view_claim_private_info ? $request_birth : mjtto_mask_claim_birth($request_birth);
             ?>
                 <tr>
                     <td><?php echo $number; ?></td>
@@ -272,9 +327,9 @@ include_once __DIR__ . '/_admin_head.php';
                         <?php if ((int)$row['prize_owner_company_id'] > 0) { ?><div class="sub">소속ID: <?php echo (int)$row['prize_owner_company_id']; ?></div><?php } ?>
                     </td>
                     <td>
-                        <div><?php echo get_text($row['request_name']); ?></div>
-                        <div class="sub"><?php echo get_text($row['request_hp']); ?></div>
-                        <?php if ($has_request_birth_column && !empty($row['request_birth'])) { ?><div class="sub">생년월일: <?php echo get_text($row['request_birth']); ?></div><?php } ?>
+                        <div><?php echo get_text($request_name); ?></div>
+                        <div class="sub"><?php echo get_text($request_hp); ?></div>
+                        <?php if ($has_request_birth_column && $request_birth !== '') { ?><div class="sub">생년월일: <?php echo get_text($request_birth_display); ?></div><?php } ?>
                     </td>
                     <td>
                         <span class="badge <?php echo mjtto_claim_badge_class($row['claim_status']); ?>"><?php echo get_text(mjtto_claim_status_name($row['claim_status'])); ?></span>

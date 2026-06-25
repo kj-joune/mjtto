@@ -5,6 +5,56 @@ include_once __DIR__ . '/_admin_common.php';
 
 $auth = mjtto_require_admin();
 
+if (!function_exists('mjtto_mask_claim_name')) {
+    function mjtto_mask_claim_name($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            $len = (int)mb_strlen($value, 'UTF-8');
+            if ($len <= 1) return '*';
+            if ($len === 2) return mb_substr($value, 0, 1, 'UTF-8') . '*';
+            return mb_substr($value, 0, 1, 'UTF-8') . str_repeat('*', $len - 2) . mb_substr($value, -1, 1, 'UTF-8');
+        }
+
+        if (preg_match_all('/./us', $value, $matches)) {
+            $chars = $matches[0];
+            $len = count($chars);
+            if ($len <= 1) return '*';
+            if ($len === 2) return $chars[0] . '*';
+            return $chars[0] . str_repeat('*', $len - 2) . $chars[$len - 1];
+        }
+
+        $len = strlen($value);
+        if ($len <= 1) return '*';
+        if ($len === 2) return substr($value, 0, 1) . '*';
+        return substr($value, 0, 1) . str_repeat('*', $len - 2) . substr($value, -1);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_hp')) {
+    function mjtto_mask_claim_hp($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        $len = strlen($digits);
+        if ($len === 0) return '';
+        if ($len <= 4) return str_repeat('*', $len);
+        if ($len <= 7) return substr($digits, 0, 3) . str_repeat('*', $len - 3);
+        return substr($digits, 0, 3) . str_repeat('*', $len - 7) . substr($digits, -4);
+    }
+}
+
+if (!function_exists('mjtto_mask_claim_birth')) {
+    function mjtto_mask_claim_birth($value)
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string)$value);
+        if ($digits === '') return '';
+        if (strlen($digits) < 4) return str_repeat('*', strlen($digits));
+        return substr($digits, 0, 2) . '**-**-' . substr($digits, -2);
+    }
+}
+
 $issue_id = isset($_GET['issue_id']) ? (int)$_GET['issue_id'] : 0;
 if ($issue_id < 1) {
     alert('잘못된 접근입니다.');
@@ -19,6 +69,7 @@ $draw = mjtto_get_round_draw($issue['round_no']);
 $prize_map = mjtto_get_prize_map($issue['round_no'], $issue['company_id'], $issue['branch_id']);
 $claim_map = mjtto_get_claim_map_by_issue($issue_id, $auth);
 $claim_table_ready = mjtto_claim_table_exists();
+$can_view_claim_private_info = ($auth['role'] === 'SUPER_ADMIN');
 
 $issue_game_count = (int)$issue['issue_game_count'];
 if ($issue_game_count < 1) {
@@ -283,6 +334,12 @@ include_once __DIR__ . '/_admin_head.php';
             $nums = $row['_nums'];
             $page_no = (int)$row['_page_no'];
             $page_game_no = (int)$row['_page_game_no'];
+            $customer_name = $can_view_claim_private_info ? (string)$row['customer_name'] : mjtto_mask_claim_name($row['customer_name']);
+            $customer_hp = $can_view_claim_private_info ? (string)$row['customer_hp'] : mjtto_mask_claim_hp($row['customer_hp']);
+            $claim_birth = $claim ? (string)($claim['request_birth'] ?? '') : '';
+            $claim_birth_display = $can_view_claim_private_info ? $claim_birth : mjtto_mask_claim_birth($claim_birth);
+            $request_name_value = $can_view_claim_private_info ? (string)$row['customer_name'] : '';
+            $request_hp_value = $can_view_claim_private_info ? (string)$row['customer_hp'] : '';
         ?>
             <tr>
                 <td><?php echo (int)$row['_row_no']; ?></td>
@@ -311,14 +368,14 @@ include_once __DIR__ . '/_admin_head.php';
                 </td>
                 <td><?php echo get_text(mjtto_item_status_name($row['item_status'])); ?></td>
                 <td>
-                    <div><?php echo get_text($row['customer_name']); ?></div>
-                    <div class="sub"><?php echo get_text($row['customer_hp']); ?></div>
+                    <div><?php echo get_text($customer_name); ?></div>
+                    <div class="sub"><?php echo get_text($customer_hp); ?></div>
                 </td>
                 <td>
                     <?php if ($claim) { ?>
                         <span class="badge <?php echo mjtto_claim_badge_class($claim['claim_status']); ?>"><?php echo get_text(mjtto_claim_status_name($claim['claim_status'])); ?></span>
                         <div class="sub">요청자: <?php echo get_text($claim['request_by']); ?></div>
-                        <?php if (!empty($claim['request_birth'])) { ?><div class="sub">생년월일: <?php echo get_text($claim['request_birth']); ?></div><?php } ?>
+                        <?php if ($claim_birth !== '') { ?><div class="sub">생년월일: <?php echo get_text($claim_birth_display); ?></div><?php } ?>
                         <?php if ($claim['requested_at']) { ?><div class="sub">요청일: <?php echo get_text($claim['requested_at']); ?></div><?php } ?>
                         <?php if ($claim['paid_at']) { ?><div class="sub">지급일: <?php echo get_text($claim['paid_at']); ?></div><?php } ?>
                         <?php if ($claim['reject_reason']) { ?><div class="sub">사유: <?php echo get_text($claim['reject_reason']); ?></div><?php } ?>
@@ -332,8 +389,8 @@ include_once __DIR__ . '/_admin_head.php';
                             <input type="hidden" name="action" value="request">
                             <input type="hidden" name="issue_item_id" value="<?php echo (int)$row['issue_item_id']; ?>">
                             <input type="hidden" name="return_url" value="<?php echo get_text($return_url); ?>">
-                            <input type="text" name="request_name" value="<?php echo get_text($row['customer_name']); ?>" class="w-name" placeholder="당첨자명" required>
-                            <input type="text" name="request_hp" value="<?php echo get_text($row['customer_hp']); ?>" class="w-hp" placeholder="휴대폰" required>
+                            <input type="text" name="request_name" value="<?php echo get_text($request_name_value); ?>" class="w-name" placeholder="당첨자명" required>
+                            <input type="text" name="request_hp" value="<?php echo get_text($request_hp_value); ?>" class="w-hp" placeholder="휴대폰" required>
                             <?php if (mjtto_claim_column_exists('request_birth')) { ?><input type="text" name="request_birth" value="<?php echo get_text($claim['request_birth'] ?? ''); ?>" class="w-birth" placeholder="생년월일 1990-01-01" required><?php } ?>
                             <input type="text" name="request_memo" value="" class="w-memo" placeholder="메모(선택)">
                             <button type="submit" class="btn btn-save">지급요청 등록</button>

@@ -5,8 +5,8 @@ include_once __DIR__ . '/_admin_common.php';
 
 $auth = mjtto_require_admin();
 
-if (!in_array($auth['role'], array('SUPER_ADMIN', 'COMPANY_ADMIN'), true)) {
-    alert('엑셀 다운로드 권한이 없습니다.', './claim_list.php');
+if ($auth['role'] !== 'SUPER_ADMIN') {
+    alert('엑셀 다운로드는 최고관리자만 가능합니다.', './claim_list.php');
 }
 
 if (!mjtto_claim_table_exists()) {
